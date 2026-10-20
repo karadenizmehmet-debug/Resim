@@ -34,7 +34,7 @@
                 <i class="fa-solid fa-wand-magic-sparkles text-blue-500"></i>
                 Sınırsız Arkaplan Silici
             </h1>
-            <div class="text-sm font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full flex items-center border border-green-200">
+            <div class="text-sm font-semibold text-green-600 bg-green-50 px-3 py-1 rounded-full flex items-center border border-green-200 shadow-sm">
                 <i class="fa-solid fa-infinity mr-1"></i> %100 Ücretsiz & Limitsiz
             </div>
         </div>
@@ -42,8 +42,7 @@
 
     <main class="flex-grow max-w-5xl mx-auto px-4 py-8 w-full flex flex-col gap-6">
         
-        <!-- Yükleme Durumu Uyarı Alanı -->
-        <div id="aiStatusBox" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm">
+        <div id="aiStatusBox" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm transition-colors duration-300">
             <div class="loader !w-5 !h-5 !border-2 !border-t-blue-600"></div>
             <span class="text-sm font-medium" id="aiStatusText">Yapay Zeka Modülü Yükleniyor... Lütfen bekleyin.</span>
         </div>
@@ -88,15 +87,17 @@
         </div>
         <style>@keyframes progress-stripes { from { background-position: 1rem 0; } to { background-position: 0 0; } }</style>
 
-        <div id="gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            <!-- Gallery items -->
-        </div>
+        <div id="gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"></div>
 
     </main>
 
     <div id="toastContainer" class="fixed bottom-5 right-5 flex flex-col gap-2 z-50 pointer-events-none"></div>
 
     <script>
+        // GLOBAL DEĞİŞKENLER VE ARAYÜZ FONKSİYONLARI
+        window.isAILoaded = false;
+        window.imglyRemoveBackground = null;
+        
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('fileInput');
         const gallery = document.getElementById('gallery');
@@ -109,19 +110,10 @@
         const progressBar = document.getElementById('progressBar');
         const toastContainer = document.getElementById('toastContainer');
         const aiStatusBox = document.getElementById('aiStatusBox');
-        const aiStatusText = document.getElementById('aiStatusText');
 
         const MAX_FILES = 40;
         let imagesData = []; 
         let isProcessing = false;
-        let isAILoaded = false;
-        let activePublicPath = "";
-
-        // CDN Listesi (Sırayla Dener)
-        const CDN_LIST = [
-            "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.14.0/dist/browser.js",
-            "https://unpkg.com/@imgly/background-removal@1.14.0/dist/browser.js"
-        ];
 
         window.showToast = function(message, type = 'error') {
             const toast = document.createElement('div');
@@ -138,58 +130,9 @@
             }, 5000);
         }
 
-        // Kütüphaneyi güvenli yükleme fonksiyonu
-        async function initAI() {
-            for (let i = 0; i < CDN_LIST.length; i++) {
-                const url = CDN_LIST[i];
-                try {
-                    await new Promise((resolve, reject) => {
-                        const script = document.createElement('script');
-                        script.src = url;
-                        script.onload = () => {
-                            if (typeof imglyRemoveBackground !== 'undefined') {
-                                activePublicPath = url.replace("browser.js", "");
-                                resolve();
-                            } else {
-                                reject(new Error("Global variable not found"));
-                            }
-                        };
-                        script.onerror = () => reject(new Error("Script load failed"));
-                        document.head.appendChild(script);
-                    });
-                    
-                    // Başarılı yükleme
-                    isAILoaded = true;
-                    fileInput.disabled = false;
-                    aiStatusBox.classList.replace('bg-blue-50', 'bg-green-50');
-                    aiStatusBox.classList.replace('border-blue-200', 'border-green-200');
-                    aiStatusBox.classList.replace('text-blue-700', 'text-green-700');
-                    aiStatusBox.innerHTML = `<i class="fa-solid fa-circle-check text-green-600"></i> <span class="text-sm font-medium">Yapay Zeka Hazır! Fotoğrafları yükleyebilirsiniz.</span>`;
-                    return; // Döngüden çık
-                } catch (err) {
-                    console.warn(`CDN Hatalı: ${url}`);
-                }
-            }
-
-            // Eğer hepsi başarısız olursa
-            aiStatusBox.classList.replace('bg-blue-50', 'bg-red-50');
-            aiStatusBox.classList.replace('border-blue-200', 'border-red-200');
-            aiStatusBox.classList.replace('text-blue-700', 'text-red-700');
-            aiStatusBox.innerHTML = `
-                <i class="fa-solid fa-triangle-exclamation text-red-600"></i> 
-                <span class="text-sm font-medium">Android 'content://' güvenlik duvarı motor indirmesini engelledi. Lütfen bu dosyayı bilgisayarda açın veya ücretsiz bir siteye yükleyin.</span>
-            `;
-            window.showToast("Güvenlik duvarı aşılamadı.", "error");
-        }
-
-        // Sayfa açıldığında AI'ı yüklemeye başla
-        window.addEventListener('DOMContentLoaded', () => {
-            initAI();
-        });
-
         function updateUI() {
             imageCountEl.textContent = imagesData.length;
-            if (imagesData.length > 0 && !isProcessing && isAILoaded) {
+            if (imagesData.length > 0 && !isProcessing && window.isAILoaded) {
                 startBtn.disabled = false;
                 clearBtn.disabled = false;
             } else {
@@ -204,8 +147,8 @@
         }
 
         function handleFiles(files) {
-            if (!isAILoaded) {
-                window.showToast("Lütfen Yapay Zeka modülünün yüklenmesini bekleyin.", "error");
+            if (!window.isAILoaded) {
+                window.showToast("Lütfen Yapay Zeka'nın yüklenmesini bekleyin.", "info");
                 return;
             }
             if (isProcessing) return;
@@ -239,7 +182,6 @@
             imagesData.forEach(img => {
                 const card = document.createElement('div');
                 card.className = "bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm relative group aspect-[3/4] flex flex-col";
-                
                 const displayUrl = img.processedUrl || img.originalUrl;
                 
                 let statusBadge = '';
@@ -306,7 +248,7 @@
         }
 
         startBtn.addEventListener('click', async () => {
-            if (imagesData.length === 0 || !isAILoaded) return;
+            if (imagesData.length === 0 || !window.isAILoaded || !window.imglyRemoveBackground) return;
             isProcessing = true;
             updateUI();
             progressContainer.classList.remove('hidden');
@@ -315,10 +257,10 @@
             let successCount = 0;
             let errorCount = 0;
 
+            // GitHub Pages için resmi veri sunucusu ve optimal ayarlar
             const config = {
-                publicPath: activePublicPath,
-                model: "small", // Mobil için en güvenli sürüm
-                proxyToWorker: false // Android engelini aşmak için mecburi
+                publicPath: "https://static.imgly.com/@imgly/background-removal-data/1.14.0/dist/",
+                model: "medium" 
             };
 
             for (let i = 0; i < imagesData.length; i++) {
@@ -329,15 +271,14 @@
                 renderGallery();
                 
                 try {
-                    statusText.innerHTML = `<strong>${i + 1} / ${imagesData.length}</strong> - AI İşliyor (İlk resim uzun sürer)...`;
-                    
-                    // Arayüz donmasın diye küçük bir nefes payı
-                    await new Promise(r => setTimeout(r, 100)); 
+                    statusText.innerHTML = `<strong>${i + 1} / ${imagesData.length}</strong> - AI İşliyor (İlk resim 10-15sn sürebilir)...`;
+                    await new Promise(r => setTimeout(r, 100)); // UI donmasını engellemek için
 
                     const optimizedFile = await optimizeImage(item.file);
-                    const transparentBlob = await imglyRemoveBackground(optimizedFile, config);
+                    // Yapay Zekayı Çalıştır!
+                    const transparentBlob = await window.imglyRemoveBackground(optimizedFile, config);
                     
-                    statusText.innerHTML = `<strong>${i + 1} / ${imagesData.length}</strong> - Zemin ayarlanıyor...`;
+                    statusText.innerHTML = `<strong>${i + 1} / ${imagesData.length}</strong> - Beyaz zemin ekleniyor...`;
                     const whiteBgBlob = await transparentToWhiteBg(transparentBlob);
                     
                     item.processedBlob = whiteBgBlob;
@@ -348,7 +289,7 @@
                     console.error(error);
                     item.status = 'error';
                     errorCount++;
-                    window.showToast(`Resim ${i + 1} Hatası`, "error");
+                    window.showToast(`Resim ${i + 1} işlenirken hata oluştu.`, "error");
                 }
 
                 progressBar.style.width = `${((i + 1) / imagesData.length) * 100}%`;
@@ -361,10 +302,9 @@
                 statusText.innerHTML = `<span class="text-green-600 font-bold"><i class="fa-solid fa-check"></i> ${successCount} fotoğraf tamamlandı.</span>`;
                 downloadBtn.classList.remove('hidden'); 
                 downloadBtn.classList.add('flex'); 
-                
                 if (errorCount === 0) window.showToast(`Tüm işlemler başarıyla tamamlandı!`, "success");
             } else {
-                statusText.innerHTML = `<span class="text-red-600 font-bold">İşlem başarısız. Bellek yetmemiş olabilir.</span>`;
+                statusText.innerHTML = `<span class="text-red-600 font-bold">İşlem başarısız.</span>`;
             }
             updateUI();
         });
@@ -395,5 +335,34 @@
             downloadBtn.disabled = false;
         });
     </script>
+
+    <!-- MODERN ES MODULE YÜKLEYİCİ (GitHub Pages İçin En Uygun Yöntem) -->
+    <script type="module">
+        import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.14.0/+esm")
+            .then((module) => {
+                window.imglyRemoveBackground = module.default;
+                window.isAILoaded = true;
+                
+                const aiStatusBox = document.getElementById('aiStatusBox');
+                const fileInput = document.getElementById('fileInput');
+                
+                aiStatusBox.className = "bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm";
+                aiStatusBox.innerHTML = `<i class="fa-solid fa-circle-check text-green-600"></i> <span class="text-sm font-medium">Yapay Zeka Hazır! Fotoğrafları yükleyip işlem yapabilirsiniz.</span>`;
+                fileInput.disabled = false;
+                
+                // Eğer daha önceden yüklenmiş fotoğraf varsa butonu aktifleştir
+                const startBtn = document.getElementById('startBtn');
+                if(document.getElementById('imageCount').textContent !== "0") {
+                    startBtn.disabled = false;
+                }
+            })
+            .catch((e) => {
+                console.error("Yapay zeka modülü yüklenemedi:", e);
+                const aiStatusBox = document.getElementById('aiStatusBox');
+                aiStatusBox.className = "bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm";
+                aiStatusBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600"></i> <span class="text-sm font-medium">Bağlantı engellendi. Ağınızı veya VPN'inizi kontrol edip sayfayı yenileyin.</span>`;
+            });
+    </script>
+
 </body>
 </html>
