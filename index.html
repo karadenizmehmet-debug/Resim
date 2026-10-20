@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -44,7 +45,7 @@
         
         <div id="aiStatusBox" class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm transition-colors duration-300">
             <div class="loader !w-5 !h-5 !border-2 !border-t-blue-600"></div>
-            <span class="text-sm font-medium" id="aiStatusText">Yapay Zeka Modülü Yükleniyor... Lütfen bekleyin.</span>
+            <span class="text-sm font-medium" id="aiStatusText">Yapay Zeka Sunucuları Deneniyor... Lütfen bekleyin.</span>
         </div>
 
         <div id="dropzone" class="border-2 border-dashed border-gray-300 rounded-2xl bg-white p-10 text-center transition-all duration-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer shadow-sm relative group overflow-hidden">
@@ -257,7 +258,7 @@
             let successCount = 0;
             let errorCount = 0;
 
-            // GitHub Pages için resmi veri sunucusu ve optimal ayarlar
+            // GitHub Pages için resmi veri sunucusu - ENGEL YEMEZ
             const config = {
                 publicPath: "https://static.imgly.com/@imgly/background-removal-data/1.14.0/dist/",
                 model: "medium" 
@@ -271,11 +272,10 @@
                 renderGallery();
                 
                 try {
-                    statusText.innerHTML = `<strong>${i + 1} / ${imagesData.length}</strong> - AI İşliyor (İlk resim 10-15sn sürebilir)...`;
-                    await new Promise(r => setTimeout(r, 100)); // UI donmasını engellemek için
+                    statusText.innerHTML = `<strong>${i + 1} / ${imagesData.length}</strong> - AI İşliyor (İlk resim bağlantınıza göre 15-20sn sürebilir)...`;
+                    await new Promise(r => setTimeout(r, 100));
 
                     const optimizedFile = await optimizeImage(item.file);
-                    // Yapay Zekayı Çalıştır!
                     const transparentBlob = await window.imglyRemoveBackground(optimizedFile, config);
                     
                     statusText.innerHTML = `<strong>${i + 1} / ${imagesData.length}</strong> - Beyaz zemin ekleniyor...`;
@@ -289,7 +289,7 @@
                     console.error(error);
                     item.status = 'error';
                     errorCount++;
-                    window.showToast(`Resim ${i + 1} işlenirken hata oluştu.`, "error");
+                    window.showToast(`Resim ${i + 1} işlenirken hata oluştu: ${error.message || "Bilinmeyen Hata"}`, "error");
                 }
 
                 progressBar.style.width = `${((i + 1) / imagesData.length) * 100}%`;
@@ -336,33 +336,53 @@
         });
     </script>
 
-    <!-- MODERN ES MODULE YÜKLEYİCİ (GitHub Pages İçin En Uygun Yöntem) -->
+    <!-- ÇOKLU SUNUCU (FALLBACK) YÜKLEYİCİ -->
     <script type="module">
-        import("https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.14.0/+esm")
-            .then((module) => {
-                window.imglyRemoveBackground = module.default;
+        async function loadAIEngine() {
+            const aiStatusBox = document.getElementById('aiStatusBox');
+            const fileInput = document.getElementById('fileInput');
+            const startBtn = document.getElementById('startBtn');
+            
+            // Sırayla denenecek sunucular (Biri engelliyse diğerine geçer)
+            const cdnList = [
+                "https://esm.sh/@imgly/background-removal@1.14.0",
+                "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.14.0/+esm",
+                "https://unpkg.com/@imgly/background-removal@1.14.0/dist/index.mjs"
+            ];
+
+            let isSuccess = false;
+            let lastErrorMsg = "";
+
+            for (const cdnUrl of cdnList) {
+                try {
+                    const module = await import(cdnUrl);
+                    window.imglyRemoveBackground = module.default;
+                    isSuccess = true;
+                    break; // Başarılıysa döngüden çık
+                } catch (e) {
+                    console.warn(`Sunucu başarısız (${cdnUrl}):`, e);
+                    lastErrorMsg = e.message || "Erişim engellendi";
+                }
+            }
+
+            if (isSuccess) {
                 window.isAILoaded = true;
-                
-                const aiStatusBox = document.getElementById('aiStatusBox');
-                const fileInput = document.getElementById('fileInput');
-                
                 aiStatusBox.className = "bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm";
                 aiStatusBox.innerHTML = `<i class="fa-solid fa-circle-check text-green-600"></i> <span class="text-sm font-medium">Yapay Zeka Hazır! Fotoğrafları yükleyip işlem yapabilirsiniz.</span>`;
                 fileInput.disabled = false;
-                
-                // Eğer daha önceden yüklenmiş fotoğraf varsa butonu aktifleştir
-                const startBtn = document.getElementById('startBtn');
                 if(document.getElementById('imageCount').textContent !== "0") {
                     startBtn.disabled = false;
                 }
-            })
-            .catch((e) => {
-                console.error("Yapay zeka modülü yüklenemedi:", e);
-                const aiStatusBox = document.getElementById('aiStatusBox');
+            } else {
                 aiStatusBox.className = "bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-3 shadow-sm";
-                aiStatusBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600"></i> <span class="text-sm font-medium">Bağlantı engellendi. Ağınızı veya VPN'inizi kontrol edip sayfayı yenileyin.</span>`;
-            });
+                aiStatusBox.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-600"></i> <span class="text-sm font-medium">Bağlantı Hatası: ${lastErrorMsg}. Wi-Fi değiştirip veya VPN ile sayfayı yenileyin.</span>`;
+            }
+        }
+
+        // Yükleyiciyi başlat
+        loadAIEngine();
     </script>
 
 </body>
 </html>
+```
